@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/xenolf/lego/acme"
@@ -172,5 +173,12 @@ func GetRecord(domain, keyAuth string) (fqdn string, value string) {
 	// base64URL encoding without padding
 	value = base64.RawURLEncoding.EncodeToString(keyAuthShaBytes[:sha256.Size])
 	fqdn = fmt.Sprintf("_acme-challenge.%s.", domain)
+	// Follow the CNAME chain until we get a canonical result.
+	// CAVEAT: Go's LookupCNAME is broken on unix and will bail if there are no records living under the canonical name.
+	// A temporary workaround is to add dummy A 127.0.0.1 record, it will be ignored by ACME, but the Go will be happy.
+	cfqdn, err := net.LookupCNAME(fqdn)
+	if err == nil {
+		fqdn = cfqdn
+	}
 	return
 }
